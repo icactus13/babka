@@ -3,6 +3,7 @@ from time import sleep
 from random import randint, choice
 import threading
 import markovify
+from name_gen import get_name
 
 
 def clear_screen():
@@ -54,7 +55,7 @@ def create_name():  # Создание имени бабки, если имя н
     name = input('Введи имя: ')
     if not name:
         print('Хорошо, я сгенерирую рандомное имя для бабки...')
-        name = random_name('female')
+        name = get_name('female')
         print('Имя бабки: ', name)
         return name
     elif is_string(name):
@@ -124,7 +125,7 @@ def loading(num):  # Функция, имитирующая загрузку
 
 
 def create_npc(loc, gender, level, mood):  # Создание нпц
-    name = random_name(gender)
+    name = get_name(gender)
     return NPC(name, gender, loc, level, mood)
 
 
