@@ -70,7 +70,7 @@ alphabet = [Letter('а', 'А', True, False, True),
 
 # Read in probability matrix.
 # prob[i][j] = probability that Letter j comes after Letter i
-file_name = '/mnt/data/share/software/babka_sim/matrix.csv'
+file_name = './matrix.csv'
 prob = []
 with open(file_name, newline='') as csvfile:
     prob_reader = csv.reader(csvfile, delimiter=',', quotechar='|')
@@ -171,8 +171,9 @@ def gen_matrix():
     with open('./allnames.csv', newline='', encoding='utf-8') as csvfile:
         name_reader = csv.reader(csvfile, delimiter=',', quotechar='|')  # Record file contents.
         for names in name_reader:  # Loop over names in list.
-            name = names[0]
+            name = names[0].split(';')[1]
             # Loop over letters in the current name.
+            print(name)
             for i in range(0, len(name) - 1):
                 letter1 = name[i]
                 letter2 = name[i + 1]
@@ -212,13 +213,13 @@ def get_name(s):
 
 
 if __name__ == '__main__':
-    for nu in range(0, 20):
+    for nu in range(0, 250):
         name1 = make_name()
         if name1[0][-1] == 'а' or name1[0][-1] == 'я' or name1[0][-1] == 'и':
             print(name1[0], ' -ж')
         else:
             print(name1[0], ' -м')
-    #print(get_name('male'))
+    print(get_name('male'))
 
 # input_string = "Was this a good  name? y/n"
 # good = input(input_string)
