@@ -1,9 +1,9 @@
 # coding=utf-8
+from time import sleep
 from menu import print_title, show_menu
 import helper
 import func
 from random import randint
-import sys
 
 npc = {}
 location_npc = []
@@ -58,7 +58,12 @@ def fight(victim):
     npc[victim].get_weapon()
     print_title(Babka.name + ' vs ' + npc[victim].name)
     print(Babka.name, 'HP: ', Babka.hp, '|', npc[victim].name, ' HP: ', npc[victim].hp)
-    print(Babka.name, 'Оружие: ', helper.babka_weapon[Babka.weapon][0], '|', npc[victim].name, ' Оружие: ', helper.weapon[npc[victim].weapon][0])
+    if Babka.weapon != '':
+        print(Babka.name, 'оружие: ', helper.babka_weapon[Babka.weapon][0], '|', 
+              npc[victim].name, ' оружие: ', helper.weapon[npc[victim].weapon][0])
+    else:
+        print(Babka.name, 'без оружия |',
+              npc[victim].name, ' оружие: ', helper.weapon[npc[victim].weapon][0])
     print_title('Prepare to fight!')
     input("Нажми enter для продолжения...")
     while npc[victim].hp != 0 or npc[victim].hp > 0:
@@ -70,7 +75,7 @@ def fight(victim):
         npc[victim].say()
         chance = randint(1, 15 - Babka.luck)
         print('Бабка', Babka.name, 'атакует!')
-        damage = func.calc_damage(Babka.damage, npc[victim].defence, chance - 5)
+        damage = func.calc_damage(Babka.damage, npc[victim].defence, abs(chance - 5))
         func.sleep(1)
         print('Бабка', Babka.name, 'наносит', damage, 'урона')
         npc[victim].hp = npc[victim].hp - damage
@@ -182,17 +187,19 @@ def bench_relax():
     while relaxing:
         relax = show_menu("На лавочке", helper.bench_menu, back=1)
         if relax == 1:
-            Babka.hp += 2
-            print(Babka.name, ' hp: ', Babka.hp)
-            if Babka.hp - hp >= 10:
-                Babka.talk('Сколько ж сидеть то можно!')
-                relaxing = False
+            while Babka.hp < Babka.maxhp:
+                Babka.hp += 2
+                print(Babka.name, ' hp: ', Babka.hp)
+                sleep(1)
+            Babka.talk('Сколько ж сидеть то можно!')
+            relaxing = False
         elif relax == 2:
-            Babka.hp += 10
-            print(Babka.name, ' hp: ', Babka.hp)
-            if Babka.hp - hp >= 20:
-                Babka.talk('Тошнит уже от этих семечек')
-                relaxing = False
+            while Babka.hp < Babka.maxhp:
+                Babka.hp += 10
+                print(Babka.name, ' hp: ', Babka.hp)
+                sleep(1)
+            Babka.talk('Тошнит уже от этих семечек')
+            relaxing = False
         elif relax == -1:
             relaxing = False
 
@@ -249,10 +256,10 @@ def loop():
         something
     """
     func.clear_screen()
-    Babka.hp = Babka.hp + 1
+    if Babka.hp < Babka.maxhp:
+        Babka.hp += 1
     if Babka.exp >= (100 * Babka.level) * 2:
         Babka.levelup()
-        print('Бабка', Babka.name, 'достигла нового уровня:', Babka.level, '!')
     choose = show_menu("Главное меню", helper.main_menu)
     if choose == 1:
         Babka.about()
@@ -328,4 +335,4 @@ if __name__ == "__main__":
                 else:
                     print('Правильно, оставайся с нами')
     except KeyboardInterrupt:
-        sys.exit()
+        func.exit()

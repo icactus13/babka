@@ -1,6 +1,7 @@
 import helper
 import menu
 from time import sleep
+from sys import exit
 from random import randint, choice
 import threading
 import markovify
@@ -61,7 +62,8 @@ def create_table():
                     damage INT,
                     defence INT,
                     exp INT,
-                    location INT);
+                    location INT,
+                    maxhp INT);
                     """)
 
 
@@ -83,15 +85,15 @@ def save_babka(babka):
         if len(check) == 0:
             result = select_db("Select * from babkas;")
             save = (len(result)+1, babka.name, babka.level, babka.hp, babka.strength, babka.dexterity, babka.luck,
-                    babka.tired, inv, babka.damage, babka.defence, babka.exp, babka.location)
+                    babka.tired, inv, babka.damage, babka.defence, babka.exp, babka.location, babka.maxhp)
             insert_db(
-                'INSERT INTO babkas VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', save)
+                'INSERT INTO babkas VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)', save)
         else:
             update_save = (babka.level, babka.hp, babka.strength, babka.dexterity, babka.luck,
-                           babka.tired, inv, babka.damage, babka.defence, babka.exp, babka.location, check[0][0])
+                           babka.tired, inv, babka.damage, babka.defence, babka.exp, babka.location, babka.maxhp, check[0][0])
             insert_db("UPDATE babkas SET level=?, hp=?, strength=?, dexterity=?, \
                        luck=?, tired=?, inventory=?, damage=?, defence=?, exp=?, \
-                       location=? where userid = ?", update_save)
+                       location=?, maxhp=?00000000000 where userid = ?", update_save)
 
 
 def load_babkas():
@@ -130,7 +132,8 @@ def load_babka(babka_number):
                   params[0][9],
                   params[0][10],
                   params[0][11],
-                  params[0][12])
+                  params[0][12],
+                  params[0][13])
     babka.inventory = []
     for i in params[0][8]:
         if i != '-':
@@ -246,19 +249,19 @@ def confirm(answer):
         return confirm
 
 
-def calculate(one: int, two: int, three: int):
-    """ I forgot what this function is
+# def calculate(one: int, two: int, three: int):
+#     """ I forgot what this function is
 
-    Args:
-        one (int): first number
-        two (int): second number
-        three (int): third number
+#     Args:
+#         one (int): first number
+#         two (int): second number
+#         three (int): third number
 
-    Returns:
-        int: fourth number
-    """
-    point = (abs(one + two + three / 2)).__int__()
-    return point
+#     Returns:
+#         int: fourth number
+#     """
+#     point = (abs(one + two + three / 2)).__int__()
+#     return point
 
 
 def calc_damage(att, dfn, luck=0):
@@ -272,7 +275,7 @@ def calc_damage(att, dfn, luck=0):
     Returns:
         int: Damage points
     """
-    return att - att * (dfn / 100).__int__() + luck
+    return abs(att - att * (dfn / 100).__int__() + luck)
 
 def calc_exp(babka_level, npc_level):
     """ Calculate gained experience 
@@ -284,7 +287,7 @@ def calc_exp(babka_level, npc_level):
     Returns:
         int: Gained expirience
     """
-    return round(100 * (10 + npc_level - babka_level)/(10 + babka_level))
+    return round(100 * (10 + npc_level - babka_level)/(7 + babka_level))
 
 
 def available_locations(loc1, loc2, names=False):
@@ -446,104 +449,57 @@ def loc_gen(babka, location):
 class Human:  # Класс "Человек"
     def __init__(self, name, 
                  gender=None, 
-                 level=None, 
-                 hp=None, 
-                 strength=None, 
-                 dexterity=None, 
-                 luck=None, 
-                 tired=None, 
-                 weapon=None, 
-                 damage=None, 
-                 defence=None, 
-                 exp=None, 
+                 level=1, 
                  location=''):
         self.name = name
         self.gender = gender
-        self.money = 0
         self.location = location
         self.level = level
-        self.hp = 10
-        self.strength = randint(self.level, self.level + 4) + self.level
-        self.dexterity = randint(self.level, self.level + 4) + self.level
-        self.luck = randint(self.level, self.level + 4)
-        self.weapon = ''
-        self.inventory = []
-        self.damage = 0
-        self.defence = 0
-        self.calculate_stats()
-
-    def about(self):  # Показать информацию об объекте класса
-        pol = ''
-        if self.gender == 'male':
-            pol = 'муж.'
-        elif self.gender == 'female':
-            pol = 'жен.'
-        print("Информация:")
-        print("Имя:", self.name)
-        print("Пол:", pol)
-        print('Уровень:', self.level)
-        print('HP:', self.hp)
 
     def talk(self, phrase):
         print(self.name, "-", phrase)
-
-    def calculate_stats(self):
-        if self.weapon == '':
-            self.damage = self.strength + 1
-        else:
-            self.damage = self.strength + int(helper.babka_weapon[self.weapon][1])
-        self.defence = (self.strength / 2).__int__() * self.dexterity
-        self.hp = 10 * self.level
-
-    def get_weapon(self):
-        if self.weapon == '':
-            print(self.name, 'достает', helper.weapon[self.inventory[0]][0])
-            self.weapon = self.inventory[0]
-        else:
-            print(self.name, 'крепко сжимает в руке',
-                  helper.weapon[self.weapon][0][0])
-        self.calculate_stats()
-
-    def hide_weapon(self):
-        if self.weapon != '':
-            print(self.name, 'убирает', helper.weapon[self.inventory[0]][0])
-            self.weapon = ''
-            self.calculate_stats()
-
-    def levelup(self):
-        self.hp = 10 * self.level
-        self.level = self.level + 1
-        self.strength = self.strength + 1
-        self.dexterity = self.dexterity + 1
-        if self.luck < 10:
-            if self.level % 5 == 0:
-                self.luck = self.luck + 1
 
 
 class Babka(Human):  # Подкласс "Бабка"
     def __init__(self, name, 
                  gender="female",
                  level=1,
-                 hp=None,
-                 strength=None,
-                 dexterity=None,
-                 luck=None,
-                 tired=None,
-                 weapon=None,
+                 hp=10,
+                 strength=randint(3, 7),
+                 dexterity=randint(3, 7),
+                 luck=randint(3, 7),
+                 tired=0,
                  damage=None,
                  defence=None,
-                 exp=None,
+                 exp=0,
+                 inventory = [],
+                 maxhp=20,
                  location=1):
-        super().__init__(name, gender, level, hp,  strength, dexterity,
-                         luck, tired, weapon, damage, defence, exp, location)
-        self.strength = randint(self.level, self.level + 4) + self.level
-        self.dexterity = randint(self.level, self.level + 4) + self.level
-        self.luck = randint(self.level, self.level + 4)
+        super().__init__(name, gender, level, location)
+        self.level = level
+        self.hp = hp
+        self.strength = strength
+        self.dexterity = dexterity
+        self.luck = luck
+        self.tired = tired
+        self.weapon = ''
+        self.damage = damage
+        self.defence = defence
+        self.exp = exp
+        self.location = location
+        self.inventory = inventory
+        self.maxhp = maxhp
         self.grumble_mode = 'off'
-        # self.money = 5000
-        self.tired = 0
         self.inventory.append(1)
-        self.exp = 0
+        self.calculate_stats()
+
+    def calculate_stats(self):
+        if self.weapon == '':
+            self.damage = self.strength + 1
+        else:
+            self.damage = self.strength + \
+                int(helper.babka_weapon[self.weapon][1])
+        self.defence = (self.strength / 2).__int__() * self.dexterity
 
     def about(self):
         pol = ''
@@ -599,15 +555,76 @@ class Babka(Human):  # Подкласс "Бабка"
     def smart_talk(self):
         print(self.name, "-", phrase_gen())
 
+    def levelup(self):
+        self.level = self.level + 1
+        self.maxhp = 10 + 10 * self.level
+        self.hp = self.maxhp
+        self.strength = self.strength + 1
+        self.dexterity = self.dexterity + 1
+        if self.luck < 10:
+            if self.level % 5 == 0:
+                self.luck = self.luck + 1
+        self.calculate_stats()
+        print('Бабка', self.name, 'достигла нового уровня:', self.level, '!')
+        self.about()
+
 
 class NPC(Human):  # Подкласс НПЦ
-    def __init__(self, name, gender, level, location, mood):
+    def __init__(self,
+                name,
+                gender,
+                level,
+                location,
+                mood,
+                strength=randint(3, 7),
+                dexterity=randint(3, 7),
+                ):
         super().__init__(name, gender, level, location)
+        self.strength = strength
+        self.dexterity = dexterity
+        self.inventory = []
         self.mood = mood
         self.location = location
-        # self.money = randint(10, 1000 * level)
         self.inventory.append(randint(1, helper.weapon.__len__()))
+        self.weapon = ''
         self.terpenie = 100
+        self.calculate_stats()
+        
+    def about(self):  # Показать информацию об объекте класса
+        pol = ''
+        if self.gender == 'male':
+            pol = 'муж.'
+        elif self.gender == 'female':
+            pol = 'жен.'
+        print("Информация:")
+        print("Имя:", self.name)
+        print("Пол:", pol)
+        print('Уровень:', self.level)
+        print('HP:', self.hp)
+    
+    def calculate_stats(self):
+        if self.weapon == '':
+            self.damage = int(self.strength) + 1
+        else:
+            self.damage = self.strength + int(helper.weapon[self.weapon][1])
+        self.defence = (self.strength / 2).__int__() * \
+            (self.dexterity / 1.5).__int__()
+        self.hp = 10 * self.level
+        
+    def get_weapon(self):
+        if self.weapon == '':
+            print(self.name, 'достает', helper.weapon[self.inventory[0]][0])
+            self.weapon = self.inventory[0]
+        else:
+            print(self.name, 'крепко сжимает в руке',
+                  helper.weapon[self.weapon][0][0])
+        self.calculate_stats()
+
+    def hide_weapon(self):
+        if self.weapon != '':
+            print(self.name, 'убирает', helper.weapon[self.inventory[0]][0])
+            self.weapon = ''
+            self.calculate_stats()
 
     def nervous(self, kak):
         if self.mood != 'Злой':
