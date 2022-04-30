@@ -93,7 +93,7 @@ def save_babka(babka):
                            babka.tired, inv, babka.damage, babka.defence, babka.exp, babka.location, babka.maxhp, check[0][0])
             insert_db("UPDATE babkas SET level=?, hp=?, strength=?, dexterity=?, \
                        luck=?, tired=?, inventory=?, damage=?, defence=?, exp=?, \
-                       location=?, maxhp=?00000000000 where userid = ?", update_save)
+                       location=?, maxhp=? where userid = ?", update_save)
 
 
 def load_babkas():
@@ -120,6 +120,10 @@ def load_babka(babka_number):
     """
     params = select_db(
         "Select * from babkas Where userid = " + str(babka_number) + ";")
+    inv = []
+    for i in params[0][8]:
+        if i != '-':
+            inv.append(int(i))
     babka = Babka(params[0][1],
                   "female",
                   params[0][2],
@@ -128,16 +132,12 @@ def load_babka(babka_number):
                   params[0][5],
                   params[0][6],
                   params[0][7],
-                  '1',
+                  inv,
                   params[0][9],
                   params[0][10],
                   params[0][11],
                   params[0][12],
                   params[0][13])
-    babka.inventory = []
-    for i in params[0][8]:
-        if i != '-':
-            babka.inventory.append(int(i))
     return babka
 
 
@@ -387,7 +387,7 @@ def spawn_weapon(babka):
         nothing if the weapon drop chance is not equal to 1
         Call get_new_weapon func if drop chance equal 1
     """
-    chance = randint(1, 15 - babka.luck)
+    chance = randint(1, 1)#5 - babka.luck)
     weapons = len(helper.babka_weapon)
     if chance == 1:
         if babka.location + babka.level >= weapons:
@@ -469,12 +469,12 @@ class Babka(Human):  # Подкласс "Бабка"
                  dexterity=randint(3, 7),
                  luck=randint(3, 7),
                  tired=0,
+                 inventory = [],
                  damage=None,
                  defence=None,
                  exp=0,
-                 inventory = [],
-                 maxhp=20,
-                 location=1):
+                 location=1,
+                 maxhp=20):
         super().__init__(name, gender, level, location)
         self.level = level
         self.hp = hp
@@ -490,7 +490,7 @@ class Babka(Human):  # Подкласс "Бабка"
         self.inventory = inventory
         self.maxhp = maxhp
         self.grumble_mode = 'off'
-        self.inventory.append(1)
+        #self.inventory.append(1)
         self.calculate_stats()
 
     def calculate_stats(self):
@@ -527,7 +527,7 @@ class Babka(Human):  # Подкласс "Бабка"
         for i in self.inventory:
             print('-', helper.babka_weapon[i][0],
                   '- урон:', helper.babka_weapon[i][1])
-        print('Текущая локация:', helper.locations[self.location][0])
+        print('Текущая локация:', helper.locations[self.location][1])
         print('-' * 80)
 
     def grumble(self):  # Режим ворчания
