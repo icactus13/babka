@@ -2,9 +2,10 @@
 This module contains functions for working with the database
 """
 import sqlite3
+from typing import Union, Optional
 
 
-def handle_error(text: str, e: Exception):
+def handle_error(text: str, e: Exception) -> None:
     """
     Handle a database error, print a message and re-raise the exception
 
@@ -23,7 +24,7 @@ def handle_error(text: str, e: Exception):
     raise e
 
 
-def insert_db(query, var=""):
+def insert_db(query: str, var: Union[str, tuple] = "") -> None:
     """Execute a query in the database
 
     Args:
@@ -39,7 +40,7 @@ def insert_db(query, var=""):
     conn.commit()
 
 
-def select_db(query):
+def select_db(query: str) -> list:
     """
     Return rows from DB
 
@@ -55,7 +56,7 @@ def select_db(query):
     return cur.fetchall()
 
 
-def create_table():
+def create_table() -> None:
     """
     Create the 'babkas' table in the database if it does not exist
     """
@@ -89,7 +90,7 @@ def save_babka(
     exp: int,
     location: int,
     maxhp: int
-):
+) -> None:
     """
     Save babka to the database.
 
@@ -176,13 +177,24 @@ def save_babka(
                 handle_error('Error updating values in table', e)
 
 
-def get_saves():
+def init_db():
+    """
+    Initialize the database and create the 'babkas' table if it does not exist.
+    """
+    try:
+        create_table()
+    except sqlite3.Error as e:
+        handle_error('Error initializing database', e)
+
+
+def get_saves() -> list:
     """[summary]
 
     Returns:
         [list]: List of saved babkas
     """
     try:
+        create_table()
         result = select_db("Select * from babkas;")
     except sqlite3.Error as e:
         handle_error('Error selecting values from table', e)
@@ -192,7 +204,7 @@ def get_saves():
     return names
 
 
-def get_babka_from_db(babka_number: int) -> dict:
+def get_babka_from_db(babka_number: int) -> Optional[dict]:
     """
     Get babka from db
 
@@ -203,10 +215,13 @@ def get_babka_from_db(babka_number: int) -> dict:
         dict: Babka data
     """
     try:
+        create_table()
         params = select_db(
             "Select * from babkas Where userid = " + str(babka_number) + ";")
     except sqlite3.Error as e:
         handle_error('Error selecting values from table', e)
+    if not params:
+        return None
     inv = []
     for i in params[0][3]:
         if i != '-':
@@ -227,5 +242,4 @@ def get_babka_from_db(babka_number: int) -> dict:
         'dexterity': params[0][11],  # dexterity
         'strength': params[0][12],  # strength
     }
-
     return babka

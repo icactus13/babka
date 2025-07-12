@@ -1,40 +1,23 @@
 """
 Functions
 """
-from random import randint
+from random import randint, uniform
 import markovify
 from db import save_babka
 import helper
-from menu import print_title
 from name_gen import get_name
 
 
-def print_message(message: str, msg_type='info') -> None:
-    """
-    Print a message with some formatting.
-
-    Args:
-        message (str): The message to print.
-        type (str): The type of message (info, fight, system).
-    """
-    if msg_type == 'info':
-        print(f"\033[94m{message}\033[0m")
-    elif msg_type == 'fight':
-        print(f"\033[91m{message}\033[0m")
-    else:
-        print(f"\033[92m[SYSTEM EVENT] {message}\033[0m")
-
-
-def confirm(answer):
+def confirm(answer: str) -> bool:
     """Yes/no function
 
     Args:
-        answer (string): Your answer
+        answer (str): Your answer
 
     Returns:
-        bool:
+        bool: Whether the answer is 'y' or not
     """
-    return answer.lower() == 'y' if isinstance(answer, str) else confirm(answer)
+    return answer.lower() == 'y'
 
 
 def available_locations(loc1, loc2, names=False):
@@ -54,63 +37,47 @@ def available_locations(loc1, loc2, names=False):
     return [helper.locations[i][1] for i in locs]
 
 
-def create_name():
-    """Create Babka's name
+def create_name(name=None):
+    """
+    Create Babka's name
     if no name is specified, the function will generate a random name.
+
+    Args:
+        name (string, optional): Babka's name
 
     Returns:
         string: Generated Babka's name
     """
-    print_title('Создание бабки')
-    print('Если имя не будет введено, то будет сгенерировано случайное имя.')
-    name = input('Введи имя: ')
     if not name:
-        print('Хорошо, я сгенерирую рандомное имя для бабки...')
         if helper.options.get('gen_names') == "neuro":
-            name = get_name('female')
+            name = get_name('female', use_2nd_order=True)
         else:
             name = random_name('female')
-        print('Имя бабки: ', name)
-    if type(name) is str:
-        print("Хорошо!")
     return name
 
 
-def calc_damage(att, dfn, luck=0):
-    """Calculate damage
+# def calc_damage(att, dfn, luck=0):
+#     """Calculate damage
+
+#     Args:
+#         att (int): Attack points
+#         dfn (int): defence point
+#         luck (int): lucky points, default 0
+
+#     Returns:
+#         int: Damage points
+#     """
+#     return abs(att - att * int((dfn / 100)) + luck)
+
+
+def random_name(gender: str) -> str:
+    """Random name function
 
     Args:
-        att (int): Attack points
-        dfn (int): defence point
-        luck (int): lucky points, default 0
+        gender (str): Gender, either 'female' or 'male'
 
     Returns:
-        int: Damage points
-    """
-    return abs(att - att * int((dfn / 100)) + luck)
-
-
-def calc_exp(babka_level, npc_level):
-    """Calculate experience gained from NPC
-
-    Args:
-        babka_level (int): Babka level
-        npc_level (int): NPC level
-
-    Returns:
-        int: Experience gained
-    """
-    return round(100 * (10 + npc_level - babka_level)/(7 + babka_level))
-
-
-def random_name(gender):
-    """ Random name function
-
-    Args:
-        gender (string): Gender
-
-    Returns:
-        string: Random name
+        str: Random name
     """
     name = ''
     if gender == 'female':
@@ -126,24 +93,28 @@ def save_game(babka):
     """
     Save babka to the database
 
+    This function takes a Babka object and saves its properties to the database.
+
     Args:
         babka (Babka): Babka to save
     """
+    # Call the save_babka function from the db module to save the babka to the database
     save_babka(
         name=babka.name,
         level=babka.level,
         hp=babka.stats.hp,
         strength=babka.stats.strength,
         dexterity=babka.stats.dexterity,
-        luck=babka.luck,
+        luck=babka.stats.luck,
         inventory=babka.inventory,
-        damage=babka.damage,
-        defence=babka.defence,
-        exp=babka.exp,
+        damage=babka.stats.damage,
+        defence=babka.stats.defence,
+        exp=babka.stats.exp,
         location=babka.location,
         maxhp=babka.maxhp
     )
-    print_message(f'Бабка {babka.name} успешно сохранена.', msg_type='system')
+    # Возвращаем строку для вывода в окно событий
+    return f'Бабка {babka.name} успешно сохранена!'
 
 
 def generate_phrase():
@@ -157,3 +128,80 @@ def generate_phrase():
         text = f.read()
     text_model_a = markovify.Text.from_json(text)
     return text_model_a.make_short_sentence(50)
+
+
+def calculate_attack_power(
+    strength: int,
+    weapon_damage: int,
+    base_damage: int,
+    victim_defence: int,
+    attacker_level: int = 1,
+    victim_level: int = 1,
+    crit: bool = False,
+    evaded: bool = False
+) -> float:
+    """
+    Улучшенный расчет урона с учетом силы, оружия, уровня, защиты, крита, уклонения и рандомизации.
+    """
+    if evaded:
+        return 0
+    # Базовый урон
+    attack = base_damage + strength * 2 + weapon_damage + attacker_level
+    # Рандомизация ±10%
+    attack *= uniform(0.9, 1.1)
+    # Критический удар
+    if crit:
+        attack *= 2
+    # Процентная защита
+    defence_percent = min(0.7, (victim_defence + victim_level) / 200)  # максимум 70%
+    attack = attack * (1 - defence_percent)
+    # Минимальный урон
+    if attack < 1:
+        attack = 1
+    return int(attack)
+
+
+def calculate_defence(
+    dexterity: int,
+    base_defence: int,
+    armor_defence: int = 0,
+    level: int = 1
+) -> int:
+    """
+    Улучшенный расчет защиты: базовая + ловкость + броня + бонус от уровня.
+    """
+    defence = base_defence + dexterity + armor_defence + level // 2
+    return defence
+
+
+def calculate_critical_hit(luck: int) -> bool:
+    """
+    Крит: 5% + 4% за каждую удачу, максимум 60%.
+    """
+    critical_chance = 5 + luck * 4
+    if critical_chance > 60:
+        critical_chance = 60
+    roll = randint(1, 100)
+    return roll <= critical_chance
+
+
+def calculate_evasion_chance(defence: int, luck: int) -> bool:
+    """
+    Уклонение: 1% за каждые 2 защиты + 2% за удачу, максимум 60%.
+    """
+    evasion_chance = (defence // 2) + luck * 2
+    if evasion_chance > 60:
+        evasion_chance = 60
+    roll = randint(1, 100)
+    return roll <= evasion_chance
+
+
+def print_info(info):
+    """Print info"""
+    for key, value in info.items():
+        if key == "Инвентарь":
+            print(key + ":")
+            for item in value:
+                print(f"  {item['Оружие']}: Урон {item['Урон']}")
+        else:
+            print(f"{key}: {value}")

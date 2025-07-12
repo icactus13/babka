@@ -2,19 +2,18 @@
 Class module
 """
 
-import random
-from time import sleep
 from random import randint, choice
 import helper
 from name_gen import get_name
 import functions as func
+from typing import Optional
 
 
 class Location:
     """
     A class representing a location.
     """
-    def __init__(self, location_num: int, npc: dict = None):
+    def __init__(self, location_num: int, npc: Optional[dict] = None):
         """Initialize a new Location object.
 
         Args:
@@ -22,52 +21,102 @@ class Location:
             description (str): The description of the location.
             npc (list, optional): A list of NPCs in the location. Defaults to None.
         """
+        if npc is None:
+            npc = {}
         self.location_num = location_num
         self.npc = npc
 
-    def generate_location(self, level):
+    def generate_location(self, level, babka_exp=0):
         """ Location generator
 
         Args:
             level (int): level
             location (int): Location number
+            babka_exp (int): опыт бабки
         """
         npcs = {}
+        info = []
+        exp_bonus = babka_exp // 100
+        # --- Новый блок: коэффициент сложности по расстоянию от дома ---
+        distance = max(0, self.location_num - 1)  # Дом = 1, дальше — больше
+        difficulty = 1 + distance * 0.25  # Чем дальше, тем сложнее (0.25 — шаг роста)
         if self.location_num != 1:
             num = 1
             for _ in range(1, randint(self.location_num, self.location_num + 5)):
-                npc_level = randint(level - 2, level + 2) if level > 2 else level
+                # Уровень NPC теперь зависит от расстояния
+                npc_level = int(
+                    (
+                        randint(level - 2, level + 2) if level > 2 else level
+                    ) * difficulty
+                )
+                npc_level = max(1, npc_level)
+                npc_hp = int(randint(npc_level * 30, npc_level * 70) * difficulty) + exp_bonus * 10
+                # --- Новый блок: диапазон оружия для NPC ---
+                min_weapon = min(1 + distance, len(helper.weapon))
+                max_weapon = min(
+                    len(helper.weapon), int(len(helper.weapon) * (0.3 + 0.1 * distance))
+                )
+                if max_weapon < min_weapon:
+                    max_weapon = min_weapon
+                weapon_id = randint(min_weapon, max_weapon)
+                mood = helper.mood[randint(1, 3)]
+                # --- Модификатор характеристик по настроению ---
+                if mood == 'Злой':
+                    mood_coeff = 1.2
+                elif mood == 'Добрый':
+                    mood_coeff = 0.9
+                else:
+                    mood_coeff = 1.0
                 npcs[num] = NPC(
                     name='NPC',
                     gender=choice(helper.gender),
-                    level=npc_level,
+                    level=int(npc_level * mood_coeff),
                     stats=Stats(
-                        hp=10,
-                        strength=randint(npc_level + 1, npc_level + 3),
-                        dexterity=randint(npc_level + 1, npc_level + 3),
-                        luck=randint(npc_level + 1, npc_level + 3),
-                        damage=randint(npc_level + 1, npc_level + 3),
-                        defence=randint(npc_level + 1, npc_level + 3),
+                        hp=int(npc_hp * mood_coeff),
+                        strength=int(
+                            randint(
+                                npc_level + 1, npc_level + 3) * difficulty * mood_coeff
+                            ) + exp_bonus,
+                        dexterity=int(
+                            randint(
+                                npc_level + 1, npc_level + 3) * difficulty * mood_coeff
+                            ),
+                        luck=int(
+                            randint(
+                                npc_level + 1, npc_level + 3) * difficulty * mood_coeff
+                            ),
+                        damage=int(
+                            randint(
+                                npc_level + 1, npc_level + 3) * difficulty * mood_coeff
+                            ) + exp_bonus,
+                        defence=int(
+                            randint(
+                                npc_level + 1, npc_level + 3) * difficulty * mood_coeff
+                            ) + exp_bonus,
                     ),
-                    mood=helper.mood[randint(1, 3)],
+                    mood=mood,
                     location=self.location_num
                 )
-                func.print_message(
-                    f'NPC #{num}: {npcs[num].name} успешно создан.', msg_type='system'
+                # Назначаем оружие с учётом расстояния
+                npcs[num].inventory = [weapon_id]
+                npcs[num].weapon = weapon_id
+                npcs[num].calculate_stats()
+                info.append(
+                    f'NPC #{num}: {npcs[num].name}\n'
                 )
                 num = num + 1
-                sleep(0.2)
             self.npc = npcs
         else:
-            print('Ты дома, тут никого нет.')
+            info.append('Ты дома, тут никого нет.')
+        return info
 
-    def about(self):
+    def about(self) -> str:
         """Print the location's stats.
 
         This method prints the location's name and description.
 
         """
-        print(f"Текущая локация: {helper.locations[self.location_num][0]}")
+        return f"Текущая локация: {helper.locations[self.location_num][0]}"
 
     def get_npc(self) -> dict:
         """Return the list of NPCs in the current location.
@@ -77,25 +126,28 @@ class Location:
         """
         return self.npc
 
-    def spawn_weapon(self, level):
+    def spawn_weapon(self) -> int:
         """Spawn a new weapon on location.
 
         Args:
             level (int): The babka's level.
 
         Returns:
-            int: The number of the spawned weapon.
+            int: The number of the spawned weapon, либо 0 если не сгенерировано.
         """
+        # --- Новый блок: диапазон оружия по расстоянию ---
+        distance = max(0, self.location_num - 1)
+        min_weapon = min(1 + distance, len(helper.babka_weapon))
+        max_weapon = min(
+            len(helper.babka_weapon), int(len(helper.babka_weapon) * (0.3 + 0.1 * distance))
+        )
+        if max_weapon < min_weapon:
+            max_weapon = min_weapon
         chance = randint(1, 1)  # 5 - babka.luck)
-        weapons = len(helper.babka_weapon)
         if chance == 1:
-            if self.location_num + level >= weapons:
-                random_num = weapons
-            else:
-                random_num = self.location_num + level
-            item = randint(1, random_num)
-            print(f'Ого, вот это да, смотри что валяется: {helper.babka_weapon[item][0]}!')
+            item = randint(min_weapon, max_weapon)
             return item
+        return 0
 
 
 class Stats:
@@ -129,220 +181,244 @@ class Stats:
         self.exp = exp
 
 
-class Human:
-    """
-    A class representing a human being.
-    """
-    def __init__(self, name, gender=None, level=1, location=None, stats=None):
-        """Initialize a new Human object.
+class MessageHandler:
+    """Handles formatted output of game messages."""
+    def __init__(self, output_func=print):
+        self.output_func = output_func
 
-        Args:
-            name (str): The name of the human.
-            gender (str, optional): The gender of the human. Defaults to None.
-            level (int, optional): The level of the human. Defaults to 1.
-            location (str, optional): The location of the human. Defaults to an empty string.
-            stats (Stats, optional): The statistics of the human. Defaults to None.
-        """
-        self.name = name
-        self.gender = gender
-        self.location = location
-        self.level = level
-        self.stats = stats or Stats(
-            hp=10,
-            strength=randint(self.level + 3, self.level + 7),
-            dexterity=randint(self.level + 3, self.level + 7),
-            luck=randint(self.level + 1, self.level + 3),
-            damage=2,
-            defence=2
+    def print_message(self, message, msg_type='info'):
+        """Print a formatted message with a given type."""
+        if msg_type == 'info':
+            formatted_message = f"\033[94m[{msg_type.upper()}]\033[0m: {message}"
+        elif msg_type == 'fight':
+            formatted_message = f"\033[91m[{msg_type.upper()}]\033[0m: {message}"
+        elif msg_type == 'system':
+            formatted_message = f"\033[92m[{msg_type.upper()}]\033[0m: {message}"
+        elif msg_type == 'talk':
+            formatted_message = f'\n{message}\n'
+        else:
+            formatted_message = f"[{msg_type.upper()}]: {message}"
+        self.output_func(formatted_message)
+
+
+class Combat:
+    """
+    A class representing combat between two characters.
+    """
+    def __init__(self, handler):
+        self.handler = handler
+
+    def attack(self, attacker, victim):
+        """Attack logic for combat."""
+        self.handler.print_message(attacker.say(), msg_type='talk')
+        self.handler.print_message(f'{attacker.name} атакует!', msg_type='fight')
+
+        # --- Новое: уклонение ---
+        evaded = func.calculate_evasion_chance(victim.stats.defence, victim.stats.luck)
+        if evaded:
+            self.handler.print_message(f'{victim.name} ловко уклонился от удара!', msg_type='fight')
+            return False
+
+        # --- Новое: критический удар ---
+        is_crit = func.calculate_critical_hit(attacker.stats.luck)
+        damage = func.calculate_attack_power(
+            attacker.stats.strength,
+            helper.weapon[attacker.weapon][1] if attacker.weapon else 1,
+            attacker.stats.damage,
+            victim.stats.defence,
+            getattr(attacker, 'level', 1),
+            getattr(victim, 'level', 1),
+            crit=is_crit,
+            evaded=False
         )
 
-    def talk(self, phrase):
-        """Print a phrase as if it was said by the human.
+        if is_crit:
+            self.handler.print_message(
+                f'Критический удар! {attacker.name} наносит {damage} урона', msg_type='fight'
+            )
+        else:
+            self.handler.print_message(
+                f'{attacker.name} наносит {damage} урона', msg_type='fight'
+            )
+        victim.stats.hp -= damage
+        victim.say()
+        self.handler.print_message(
+            f'{victim.name} HP: {victim.stats.hp}', msg_type='info'
+        )
+        return victim.stats.hp <= 0
 
-        Args:
-            phrase (str): The phrase to be printed.
-        """
-        print(f'{self.name}: {phrase}')
 
-
-class Babka(Human):
+class Human:
     """
-    A class representing a babka.
-
-    This class inherits from the Human class.
+    Базовый класс для всех персонажей (игрок и NPC).
     """
     def __init__(
         self,
         name,
-        gender="female",
+        gender=None,
         level=1,
+        location=1,
         stats=None,
+        inventory=None,
+        weapon=None,
+        maxhp=100,
+        mood='Нейтральный',
+        patience=100
     ):
-        """Initialize a new Babka object.
-
-        Args:
-            name (str): The name of the babka.
-            gender (str, optional): The gender of the babka. Defaults to "female".
-            level (int, optional): The level of the babka. Defaults to 1.
-            stats (Stats, optional): The statistics of the babka. Defaults to None.
-        """
-        super().__init__(name, gender, level, location=None, stats=stats)
+        self.name = name
+        self.gender = gender
         self.level = level
-        self.location = 1
+        self.location = location if location is not None else 1
         self.stats = stats or Stats(
-            hp=10,
-            strength=randint(self.level + 3, self.level + 7),
-            dexterity=randint(self.level + 3, self.level + 7),
-            luck=randint(self.level + 1, self.level + 3),
+            hp=maxhp,
+            strength=randint(level + 3, level + 7),
+            dexterity=randint(level + 3, level + 7),
+            luck=randint(level + 1, level + 3),
             damage=2,
             defence=2
         )
-        self.weapon = None
-        self.maxhp = 20
-        self.inventory = [1]
-        self.calculate_stats()
-
-    def calculate_stats(self):
-        """
-        Calculate the human's stats based on their characteristics and level.
-        """
-        if not self.weapon:
-            self.stats.damage = self.stats.strength + 1
-        else:
-            self.stats.damage = self.stats.strength + helper.babka_weapon[self.weapon][1]
-        self.stats.defence = int((self.stats.strength // 2) * (self.stats.dexterity // 1.5))
-        self.stats.hp = self.level * 10
+        self.inventory = inventory if inventory is not None else []
+        self.weapon = weapon if weapon is not None else None
+        self.maxhp = maxhp
+        self.kills = 0
+        self.mood = mood
+        self.patience = patience
 
     def about(self):
-        """Print the babka's stats.
+        """Return basic information about the character."""
+        return {
+            'Имя': self.name,
+            'Пол': 'мужской' if self.gender == 'male' else 'женский',
+            'Уровень': self.level,
+            'HP': self.stats.hp,
+            'Сила': self.stats.strength,
+            'Ловкость': self.stats.dexterity,
+            'Удача': self.stats.luck,
+            'Оружие': helper.babka_weapon[
+                self.weapon
+            ][0] if self.weapon in helper.babka_weapon else 'нет',
+            'Наносимый урон': self.stats.damage,
+            'Защита': self.stats.defence,
+            'Опыт': self.stats.exp,
+            'Инвентарь': [
+                {
+                    'Оружие': helper.babka_weapon[i][0],
+                    'Урон': helper.babka_weapon[i][1],
+                } for i in self.inventory if i in helper.babka_weapon
+            ]
+        }
 
-        This method prints the babka's name, gender, level, hit points, strength,
-        dexterity, luck, weapon, damage, defence, experience, current location,
-        and inventory.
-        """
+    def move(self, destination):
+        """Move character to destination"""
+        if destination == self.location:
+            return f"{self.name} уже находится в этой локации: {helper.locations[self.location][0]}"
+        self.location = destination
+        return f"{self.name} переместился в {helper.locations[destination][0]}"
 
-        print(
-            f"Имя: {self.name}\n"
-            f"Пол: {'мужской' if self.gender == 'male' else 'женский'}\n"
-            f"Уровень: {self.level}\n"
-            f"HP: {self.stats.hp}\n"
-            f"Сила: {self.stats.strength}\n"
-            f"Ловкость: {self.stats.dexterity}\n"
-            f"Удача: {self.stats.luck}\n"
-            f"Оружие: {helper.babka_weapon.get(self.weapon, ['нет', 0])[0]}\n"
-            f"Наносимый урон: {self.stats.damage}\n"
-            f"Защита: {self.stats.defence}\n"
-            f"Опыт: {self.stats.exp}\n"
-            f"Текущая локация: {helper.locations[self.location][1]}"
+    def calculate_stats(self):
+        """Caclulate character stats"""
+        if not self.weapon or self.weapon not in helper.babka_weapon:
+            self.stats.damage = self.stats.strength
+        else:
+            self.stats.damage = self.stats.strength * helper.babka_weapon[self.weapon][1]
+        self.stats.defence = int((self.stats.strength // 2) * (self.stats.dexterity // 1.5))
+
+    def get_new_weapon(self, weapon):
+        """ Get new weapon"""
+        weapon_list = {
+            w: helper.babka_weapon[w][0] for w in self.inventory if w in helper.babka_weapon
+        }
+        if helper.babka_weapon[weapon][0] in weapon_list.values():
+            return 'Такая штука у тебя уже есть, эх..'
+        self.inventory.append(weapon)
+        return f'Теперь у тебя есть: {helper.babka_weapon[weapon][0]}'
+
+    def get_weapon(self):
+        """Get weapon"""
+        if not self.weapon and self.inventory:
+            self.weapon = self.inventory[0]
+        self.calculate_stats()
+        if self.weapon and self.weapon in helper.weapon:
+            return f'{self.name} достает {helper.weapon[self.weapon][0]}'
+        return None
+
+    def hide_weapon(self):
+        """Hide weapon"""
+        if self.weapon:
+            self.weapon = None
+            self.calculate_stats()
+        return None
+
+    def say(self):
+        """Say phrase"""
+        return f'{self.name}: ...'
+
+
+class Babka(Human):
+    """
+    Класс для игрока-бабки.
+    """
+    def __init__(self, name, gender="female", level=1, stats=None):
+        super().__init__(
+            name=name,
+            gender=gender,
+            level=level,
+            location=1,
+            stats=stats,
+            inventory=[1],
+            weapon=None,
+            maxhp=110,
+            mood='Нейтральный',
+            patience=100
         )
-        print("Инвентарь:")
-        for i in self.inventory:
-            print(f"- Оружие: {helper.babka_weapon[i][0]}")
-            print(f"  Урон: {helper.babka_weapon[i][1]}")
-        print('-' * 80)
+        self.calculate_stats()
 
-    def smart_talk(self):
-        """
-        Print a randomly generated phrase spoken by the babka.
+    def calculate_expirience(self, npc_level) -> int:
+        """Caclulate expirience"""
+        base_exp = 40
+        diff = npc_level - self.level
+        exp = int(base_exp * (1 + 0.5 * max(0, diff)))
+        return max(10, exp)
 
-        This method uses the `generate_phrase` function to create a random phrase
-        and prints it with the babka's name as the speaker.
+    def add_experience(self, exp):
+        """Add expirience"""
+        self.stats.exp += exp
+        # Порог для повышения уровня (например, 100 * текущий уровень)
+        levelup_messages = []
+        while self.stats.exp >= 100 * self.level:
+            self.stats.exp -= 100 * self.level
+            self.level += 1
+            self.stats.strength += 2
+            self.stats.dexterity += 1
+            if self.level % 3 == 0 and self.stats.luck < 12:
+                self.stats.luck += 1
+            self.maxhp += 10
+            self.stats.hp = self.maxhp
+            levelup_messages.append(
+                f'Бабка повысила уровень до {self.level}! Сила +2, Ловкость +1, Макс. HP +10' +
+                (', Удача +1' if self.level % 3 == 0 else '')
+            )
+        self.calculate_stats()
+        return levelup_messages
 
-        Returns:
-            None
-        """
-        print(f'{self.name}: {func.generate_phrase()}')
+    def about(self):
+        info = super().about()
+        info['Тип'] = 'Бабка'
+        return info
+
+    def say(self):
+        return f'{self.name}: {func.generate_phrase()}'
 
     def levelup(self):
-        """
-        Level up the babka by increasing its attributes.
-
-        This method increments the babka's level, updates maximum and current
-        health points, increases strength and dexterity, and potentially
-        increments luck every 5 levels if it is below 10. It then recalculates
-        the babka's stats and prints the updated information.
-
-        Returns:
-            None
-        """
-
+        """Level up function"""
         self.level += 1
-        self.maxhp = 10 + 10 * self.level
+        self.maxhp = 10 + 100 * self.level
         self.stats.hp = self.maxhp
         self.stats.strength += 1
         self.stats.dexterity += 1
         if self.stats.luck < 10 and self.level % 5 == 0:
             self.stats.luck += 1
         self.calculate_stats()
-        print(f'Бабка {self.name} достигла нового уровня: {self.level}!')
-        self.about()
-
-    def move(self, destination):
-        """ Move to another location
-
-        Args:
-            current_location (int): Current location number
-            destination (int): Location number where we are going
-
-        """
-
-        if destination == self.location:
-            print('Текущая локация:', helper.locations[self.location][0])
-            print('Бабка уже находится в этой локации.')
-        else:
-            print(f'Бабка {self.name} перемещается...')
-
-            if self.location > destination:
-
-                for _ in range(0, 2 * (self.location - destination)):
-                    print('.', end="", flush=True)
-                    sleep(0.2)
-                print('')
-
-            for _ in range(0, 2 * (destination - self.location)):
-                print('.', end="", flush=True)
-                sleep(0.2)
-
-            print('')
-            print('Текущая локация:', helper.locations[destination][0])
-
-            self.location = destination
-
-    def get_new_weapon(self, weapon):
-        """ Add new weapon in Babka's inventory
-
-        Args:
-            babka (class): Your Babka
-            weapon (int): Spawned weapon
-        """
-
-        weapon_list = {}
-
-        for w in self.inventory:
-            weapon_list[w] = helper.babka_weapon[w][0]
-
-        if helper.babka_weapon[weapon][0] in weapon_list.values():
-            print('Такая штука у тебя уже есть, эх..')
-        else:
-            self.inventory.append(weapon)
-            print('Теперь у тебя есть:', helper.babka_weapon[weapon][0])
-
-    def attack(self, victim):
-        chance = randint(1, self.stats.luck)
-        func.print_message(f'Бабка {self.name} атакует!', msg_type='fight')
-        sleep(1)
-        crit = random.random()
-        damage = func.calc_damage(self.stats.damage, victim.stats.defence, abs(chance - 5))
-        if crit < 0.1 + self.stats.luck * 0.01:
-            damage *= 2
-            func.print_message(f'Бабка {self.name} лютует и наносит {damage} урона', msg_type='fight')
-        else:
-            func.print_message(f'Бабка {self.name} наносит {damage} урона', msg_type='fight')
-        victim.stats.hp -= damage
-        func.print_message(f'{victim.name} HP: {victim.stats.hp}', msg_type='info')
-        victim.say()
-        sleep(1)
-        return victim.stats.hp <= 0
 
 
 class NPC(Human):
@@ -357,7 +433,7 @@ class NPC(Human):
         level=1,
         stats=None,
         mood='Нейтральный',
-        location=None
+        location=1
     ):
         """
         Initialize a new NPC object.
@@ -368,13 +444,13 @@ class NPC(Human):
             level (int): The level of the NPC. Defaults to 1.
             stats (Stats): The stats of the NPC. Defaults to None.
             mood (str): The mood of the NPC. Defaults to 'Нейтральный'.
-            location (str): The location of the NPC. Defaults to None.
+            location (int): The location of the NPC. Defaults to 1.
         """
 
-        super().__init__(name, gender, level, location=location, stats=stats)
+        super().__init__(name, gender, level, location, stats)
 
         self.stats = stats or Stats(
-            hp=10,
+            hp=100,
             strength=randint(self.level + 3, self.level + 7),
             dexterity=randint(self.level + 3, self.level + 7),
             luck=randint(self.level + 1, self.level + 3),
@@ -386,25 +462,23 @@ class NPC(Human):
         self.name = self.gen_name(gender)
         self.inventory = []
         self.mood = mood
-        self.location = None
+        self.location = location
         self.inventory.append(randint(1, len(helper.weapon)))
-        self.weapon = ''
+        self.weapon = None
         self.patience = 100
         self.calculate_stats()
 
     def about(self):
-        """Print the NPC's stats.
-
-        This method prints the NPC's name, gender, level, and hit points.
-
         """
+        Return a dictionary containing basic information about the NPC.
 
-        print(
-            f"Имя: {self.name}\n"
-            f"Пол: {'мужской' if self.gender == 'male' else 'женский'}\n"
-            f"Уровень: {self.level}\n"
-            f"HP: {self.stats.hp}"
-        )
+        Returns:
+            dict: A dictionary with the NPC's name and gender.
+        """
+        return {
+            'Имя': self.name,
+            'Пол': 'мужской' if self.gender == 'male' else 'женский',
+        }
 
     def calculate_stats(self):
         """Calculate the NPC's combat stats.
@@ -419,14 +493,12 @@ class NPC(Human):
             None
         """
 
-        if self.weapon == '':
+        if not self.weapon or self.weapon not in helper.weapon:
             self.damage = int(self.stats.strength) + 1
         else:
             self.damage = self.stats.strength + int(helper.weapon[self.weapon][1])
 
-        self.defence = int((self.stats.strength / 2)) * \
-            int((self.stats.dexterity / 1.5))
-        self.stats.hp = 10 * self.level
+        self.defence = int((self.stats.strength / 2)) * int((self.stats.dexterity / 1.5))
 
     def gen_name(self, gender):
         """Generate a random name for an NPC based on gender.
@@ -438,61 +510,68 @@ class NPC(Human):
             str: A random name for the NPC.
         """
         if helper.options.get('gen_names') == "neuro":
-            return get_name(gender)
+            return get_name(
+                gender,
+                use_2nd_order=True
+            )
         return func.random_name(gender)
 
     def say(self):
-        """Make the NPC say a random phrase based on their mood.
+        """Print a phrase spoken by the NPC.
+
+        This method uses the `random` module to select a phrase from a list of
+        phrases based on the NPC's current mood.
 
         Args:
             None
 
         Returns:
-            None
+            str: A phrase spoken by the NPC.
         """
         phrases = {
             'Добрый': helper.happy_phrases,
             'Нейтральный': helper.neutral_phrases,
             'Злой': helper.angry_phrases
         }[self.mood]
-        self.talk(choice(phrases))
+        return f'{self.name}: {choice(phrases)}'
 
-    def nervous(self, kak):
-        """Change NPC's mood if they are not already angry.
+    def nervous(self, act):
+        """
+        Make the NPC nervous.
 
-        If kak is 1, the NPC loses 10 patience. If kak is not 1, the NPC
-        loses 40 patience. If the NPC's patience reaches 0, their mood is
-        changed to the previous mood in the helper.mood dictionary.
+        If the NPC is not already in a 'Злой' mood, this method reduces the
+        NPC's patience by a certain amount based on the 'act' argument. If the
+        NPC's patience reaches 0, the NPC's mood is changed to the one above
+        their current mood in the helper.mood dictionary.
 
         Args:
-            kak (int): 1 if the NPC loses 10 patience, any other value if
-                the NPC loses 40 patience.
+            act (int): The type of action that made the NPC nervous. A value of
+                1 indicates a minor action, while any other value indicates a
+                major action.
 
         Returns:
-            None
+            str: A message indicating whether the NPC's mood changed.
         """
         if self.mood != 'Злой':
-            if kak == 1:
-                print(self.name, 'м?')
-                self.patience = self.patience - 10
-                print('Терпение', self.name, ': ', self.patience)
+            if act == 1:
+                self.patience -= 10
             else:
-                print(self.name, 'эй!')
-                self.patience = self.patience - 40
-                print('Терпение', self.name, ': ', self.patience)
+                self.patience -= 40
             if self.patience <= 0:
                 self.patience = 100
                 for k, m in helper.mood.items():
                     if m == self.mood:
                         self.mood = helper.mood[k - 1]
-                print(self.name, 'изменил настроение на', self.mood)
+                return f'{self.name} изменил настроение на {self.mood}'
+        return f'{self.name} не изменил настроение'
 
     def get_weapon(self):
-        """Make the NPC draw a weapon from their inventory.
+        """
+        Equip the NPC with a weapon from their inventory.
 
-        If the NPC has no weapon equipped, they draw the first one in their
-        inventory. If they already have a weapon equipped, they hold it
-        tightly and ready themselves for battle.
+        If the NPC does not currently have a weapon equipped, this method assigns
+        the first weapon from their inventory to the 'weapon' attribute and then
+        recalculates the NPC's combat stats.
 
         Args:
             None
@@ -500,14 +579,12 @@ class NPC(Human):
         Returns:
             None
         """
-        if self.weapon == '':
-            print(self.name, 'достает', helper.weapon[self.inventory[0]][0])
+        if not self.weapon and self.inventory:
             self.weapon = self.inventory[0]
-        else:
-            print(
-                self.name, 'крепко сжимает в руке', helper.weapon[self.weapon][0][0]
-            )
         self.calculate_stats()
+        if self.weapon and self.weapon in helper.weapon:
+            return f'{self.name} достает {helper.weapon[self.weapon][0]}'
+        return None
 
     def hide_weapon(self):
         """Make the NPC hide their weapon.
@@ -523,20 +600,5 @@ class NPC(Human):
             None
         """
         if self.weapon != '':
-            print(self.name, 'убирает', helper.weapon[self.inventory[0]][0])
             self.weapon = ''
             self.calculate_stats()
-
-    def attack(self, babka):
-        func.print_message(f'{self.name} атакует!', msg_type='fight')
-        sleep(1)
-        damage = func.calc_damage(self.stats.damage, babka.stats.defence)
-        chance = randint(1, 15 - babka.stats.luck)
-        if chance == 1:
-            func.print_message(f'Бабка {babka.name} ловко уклонилась от удара', msg_type='fight')
-        else:
-            func.print_message(f'{self.name} наносит {damage} урона', msg_type='fight')
-            babka.stats.hp -= damage
-        func.print_message(f'{babka.name} HP: {babka.stats.hp}', msg_type='info')
-        sleep(1)
-        return babka.stats.hp <= 0
