@@ -5,3 +5,4 @@ saves.db
 .vscode
 .venv
 pylint_curses_menu.txt
+.dockerignore
