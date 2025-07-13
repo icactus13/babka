@@ -4,7 +4,7 @@ Class module
 
 from random import randint, choice
 import helper
-from name_gen import get_name
+# from name_gen import get_name
 import functions as func
 from typing import Optional
 
@@ -211,12 +211,12 @@ class Combat:
     def attack(self, attacker, victim):
         """Attack logic for combat."""
         self.handler.print_message(attacker.say(), msg_type='talk')
-        self.handler.print_message(f'{attacker.name} атакует!', msg_type='fight')
+        self.handler.print_message(f'{attacker.name} атакует!', msg_type='action')
 
         # --- Новое: уклонение ---
         evaded = func.calculate_evasion_chance(victim.stats.defence, victim.stats.luck)
         if evaded:
-            self.handler.print_message(f'{victim.name} ловко уклонился от удара!', msg_type='fight')
+            self.handler.print_message(f'{victim.name} ловко уклонился от удара!', msg_type='action')
             return False
 
         # --- Новое: критический удар ---
@@ -234,11 +234,11 @@ class Combat:
 
         if is_crit:
             self.handler.print_message(
-                f'Критический удар! {attacker.name} наносит {damage} урона', msg_type='fight'
+                f'Критический удар! {attacker.name} наносит {damage} урона', msg_type='action'
             )
         else:
             self.handler.print_message(
-                f'{attacker.name} наносит {damage} урона', msg_type='fight'
+                f'{attacker.name} наносит {damage} урона', msg_type='action'
             )
         victim.stats.hp -= damage
         victim.say()
@@ -284,37 +284,6 @@ class Human:
         self.mood = mood
         self.patience = patience
 
-    def about(self):
-        """Return basic information about the character."""
-        return {
-            'Имя': self.name,
-            'Пол': 'мужской' if self.gender == 'male' else 'женский',
-            'Уровень': self.level,
-            'HP': self.stats.hp,
-            'Сила': self.stats.strength,
-            'Ловкость': self.stats.dexterity,
-            'Удача': self.stats.luck,
-            'Оружие': helper.babka_weapon[
-                self.weapon
-            ][0] if self.weapon in helper.babka_weapon else 'нет',
-            'Наносимый урон': self.stats.damage,
-            'Защита': self.stats.defence,
-            'Опыт': self.stats.exp,
-            'Инвентарь': [
-                {
-                    'Оружие': helper.babka_weapon[i][0],
-                    'Урон': helper.babka_weapon[i][1],
-                } for i in self.inventory if i in helper.babka_weapon
-            ]
-        }
-
-    def move(self, destination):
-        """Move character to destination"""
-        if destination == self.location:
-            return f"{self.name} уже находится в этой локации: {helper.locations[self.location][0]}"
-        self.location = destination
-        return f"{self.name} переместился в {helper.locations[destination][0]}"
-
     def calculate_stats(self):
         """Caclulate character stats"""
         if not self.weapon or self.weapon not in helper.babka_weapon:
@@ -322,32 +291,6 @@ class Human:
         else:
             self.stats.damage = self.stats.strength * helper.babka_weapon[self.weapon][1]
         self.stats.defence = int((self.stats.strength // 2) * (self.stats.dexterity // 1.5))
-
-    def get_new_weapon(self, weapon):
-        """ Get new weapon"""
-        weapon_list = {
-            w: helper.babka_weapon[w][0] for w in self.inventory if w in helper.babka_weapon
-        }
-        if helper.babka_weapon[weapon][0] in weapon_list.values():
-            return 'Такая штука у тебя уже есть, эх..'
-        self.inventory.append(weapon)
-        return f'Теперь у тебя есть: {helper.babka_weapon[weapon][0]}'
-
-    def get_weapon(self):
-        """Get weapon"""
-        if not self.weapon and self.inventory:
-            self.weapon = self.inventory[0]
-        self.calculate_stats()
-        if self.weapon and self.weapon in helper.weapon:
-            return f'{self.name} достает {helper.weapon[self.weapon][0]}'
-        return None
-
-    def hide_weapon(self):
-        """Hide weapon"""
-        if self.weapon:
-            self.weapon = None
-            self.calculate_stats()
-        return None
 
     def say(self):
         """Say phrase"""
@@ -400,11 +343,6 @@ class Babka(Human):
             )
         self.calculate_stats()
         return levelup_messages
-
-    def about(self):
-        info = super().about()
-        info['Тип'] = 'Бабка'
-        return info
 
     def say(self):
         return f'{self.name}: {func.generate_phrase()}'
@@ -468,18 +406,6 @@ class NPC(Human):
         self.patience = 100
         self.calculate_stats()
 
-    def about(self):
-        """
-        Return a dictionary containing basic information about the NPC.
-
-        Returns:
-            dict: A dictionary with the NPC's name and gender.
-        """
-        return {
-            'Имя': self.name,
-            'Пол': 'мужской' if self.gender == 'male' else 'женский',
-        }
-
     def calculate_stats(self):
         """Calculate the NPC's combat stats.
 
@@ -510,10 +436,7 @@ class NPC(Human):
             str: A random name for the NPC.
         """
         if helper.options.get('gen_names') == "neuro":
-            return get_name(
-                gender,
-                use_2nd_order=True
-            )
+            return helper.markov_gen.generate(gender=gender)
         return func.random_name(gender)
 
     def say(self):

@@ -5,36 +5,7 @@ from random import randint, uniform
 import markovify
 from db import save_babka
 import helper
-from name_gen import get_name
-
-
-def confirm(answer: str) -> bool:
-    """Yes/no function
-
-    Args:
-        answer (str): Your answer
-
-    Returns:
-        bool: Whether the answer is 'y' or not
-    """
-    return answer.lower() == 'y'
-
-
-def available_locations(loc1, loc2, names=False):
-    """ Return list of available locations
-
-    Args:
-        loc1 (int): Current location
-        loc2 (int): ?
-        names (bool, optional): return the name of the location, not its number. Defaults to False.
-
-    Returns:
-        string: Location name or nubmer
-    """
-    locs = [i for i in helper.locations if i not in (loc1, loc2)]
-    if names:
-        return [helper.locations[i][0] for i in locs]
-    return [helper.locations[i][1] for i in locs]
+# from name_gen import get_name
 
 
 def create_name(name=None):
@@ -50,24 +21,10 @@ def create_name(name=None):
     """
     if not name:
         if helper.options.get('gen_names') == "neuro":
-            name = get_name('female', use_2nd_order=True)
+            name = helper.markov_gen.generate(gender='female')
         else:
             name = random_name('female')
     return name
-
-
-# def calc_damage(att, dfn, luck=0):
-#     """Calculate damage
-
-#     Args:
-#         att (int): Attack points
-#         dfn (int): defence point
-#         luck (int): lucky points, default 0
-
-#     Returns:
-#         int: Damage points
-#     """
-#     return abs(att - att * int((dfn / 100)) + luck)
 
 
 def random_name(gender: str) -> str:
@@ -194,14 +151,3 @@ def calculate_evasion_chance(defence: int, luck: int) -> bool:
         evasion_chance = 60
     roll = randint(1, 100)
     return roll <= evasion_chance
-
-
-def print_info(info):
-    """Print info"""
-    for key, value in info.items():
-        if key == "Инвентарь":
-            print(key + ":")
-            for item in value:
-                print(f"  {item['Оружие']}: Урон {item['Урон']}")
-        else:
-            print(f"{key}: {value}")

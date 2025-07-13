@@ -3,6 +3,8 @@ This module contains functions for working with the database
 """
 import sqlite3
 from typing import Union, Optional
+import helper
+import json
 
 
 def handle_error(text: str, e: Exception) -> None:
@@ -121,9 +123,7 @@ def save_babka(
     except sqlite3.Error as e:
         handle_error('Error selecting values from table', e)
     else:
-        inv = '-'
-        for i in inventory:
-            inv += str(i) + '-'
+        inv = json.dumps(inventory, ensure_ascii=False)
         print(inv)
         if len(check) == 0:
             try:
@@ -222,15 +222,23 @@ def get_babka_from_db(babka_number: int) -> Optional[dict]:
         handle_error('Error selecting values from table', e)
     if not params:
         return None
-    inv = []
-    for i in params[0][3]:
-        if i != '-':
-            inv.append(int(i))
+    # Десериализация инвентаря из JSON
+    try:
+        inv = json.loads(params[0][3])
+    except Exception:
+        inv = []
+    # Фильтрация: только уникальные id, которые есть в babka_weapon
+    filtered = []
+    seen = set()
+    for item_id in inv:
+        if isinstance(item_id, int) and item_id in helper.babka_weapon and item_id not in seen:
+            filtered.append(item_id)
+            seen.add(item_id)
     babka = {
         'name': params[0][1],  # name
         'gender': "female",
         'level': params[0][2],  # level
-        'inventory': inv,
+        'inventory': filtered,
         'damage': params[0][4],  # damage
         'defence': params[0][5],  # defence
         'luck': params[0][6],  # luck
@@ -243,3 +251,14 @@ def get_babka_from_db(babka_number: int) -> Optional[dict]:
         'strength': params[0][12],  # strength
     }
     return babka
+
+
+def delete_babka_by_id(userid: int) -> None:
+    """
+    Удалить сохранение бабки по userid
+    """
+    try:
+        create_table()
+        insert_db("DELETE FROM babkas WHERE userid = ?", (userid,))
+    except Exception as e:
+        handle_error('Error deleting babka from table', e)
